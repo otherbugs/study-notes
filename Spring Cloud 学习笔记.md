@@ -168,6 +168,8 @@ Ribbon 默认提供了很多负载均衡算法；例如轮询、随机等；也�
 
 #### 1、添加依赖
 
+其实已经添加了spring-cloud-starter-eureka,就不需要添加ribbon的依赖了 ，因为Eureka包含了；
+
 ```xml
 <dependency>
   <groupId>org.springframework.cloud</groupId>
@@ -175,7 +177,43 @@ Ribbon 默认提供了很多负载均衡算法；例如轮询、随机等；也�
 </dependency>
 ```
 
+- 在使用 RestTemplate 的时候，如果 RestTemplate 上面有这个 @LoadBalanced 注解，那么这个 RestTemplate 调用的远程地址，会走负载均衡；
 
+
+
+## 六、使用 Feign 实现声明式 REST 调用
+
+### 6.1 Feign 简介
+
+声明式、模板化的HTTP客户端；
+
+### 6.2 Feign 使用
+
+#### 6.2.1 添加依赖
+
+```xml
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-feign</artifactId>
+</dependency>
+```
+
+#### 6.2.2 创建一个 Feign 接口，并添加 @FeignClient 注解；
+
+feign本身里面就包含有了ribbon，就是这个注解 @FeignClient;
+
+#### 6.2.3 修改启动类，添加注解 @EnableFeignClients
+
+### 6.3 自定义 Feign 配置
+
+Spring Cloud允许通过注解 @FeignClient 的 configuration属性自定义Feign的属性，自定义的比自带的 FeignClientsConfiguration 优先级要高；
+
+```java
+@FeignClient(name = "microservice-provider-user", configuration = FeignConfiguration.class)
+public interface UserFeignClient{}
+```
+
+- 与Ribbon 配置自定义一样，自定义的FeignConfiguration类也不能包含在主应用程序上下文的@ComponentScan 扫描的包重叠，否则自定义的配置信息会被所有的@FeignClient共享；
 
 # 其他知识点
 
@@ -195,3 +233,75 @@ Ribbon 默认提供了很多负载均衡算法；例如轮询、随机等；也�
 2. 删除 src 文件夹，并修改 pom 文件；
 3. 然后在这个项目上 new module；
 4. 修改子项目 pom
+
+
+
+# demo顺序
+
+## 第三章
+
+**服务提供者**
+
+microservice-simple-provider-user
+
+**服务消费者**
+
+microservice-simple-consumer-movie
+
+## 第四章
+
+**编写Eureka Server**
+
+microservice-discovery-eureka
+
+**微服务注册到Eureka Server**
+
+microservice-provider-user
+
+**Eureka Server 的高可用**
+
+microservice-discovery-eureka-ha
+
+**为 Eureka server 添加用户认证**
+
+microservice-discovery-eureka-authenticating
+
+**Eureka 的元数据**
+
+microservice-provider-user-my-metadata
+
+microservice-consumer-movie-understanding-metadata
+
+## 第五章
+
+**为服务消费者整合Ribbon**
+
+microservice-consumer-movie-ribbon
+
+**使用Java代码自动配置**
+
+mircoservice-consumer-movie-ribbon-customizing
+
+**使用属性自定义Ribbon配置**
+
+mircoservice-consumer-movie-ribbon-customizing-properties
+
+**是 Ribbon 脱离 Eureka**
+
+microservice-consumer-movie-without-eureka
+
+## 第六章
+
+**为消费者整合 Feign**
+
+microservice-consumer-movie-feign
+
+**自定义Feign配置**
+
+microservice-consumer-movie-feign-customizing
+
+**手动创建Feign**
+
+microservice-provider-user-with-auth
+
+microservice-consumer-movie-feign-manual
