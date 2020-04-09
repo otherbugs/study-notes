@@ -2,6 +2,26 @@
 
 ## 一、微服务
 
+### Spring Boot Actuator 健康检查、审计、统计、监控
+
+| Endpoint ID | Description                   |
+| ----------- | ----------------------------- |
+| health      | 应用的健康信息                |
+| info        | 应用的基本信息                |
+| mappings    | 显示所有的@RequestMapping路径 |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+|             |                               |
+
+
+
 ## 二、简介 Spring Cloud
 
 ### 2.1 简介
@@ -200,7 +220,7 @@ Ribbon 默认提供了很多负载均衡算法；例如轮询、随机等；也�
 
 #### 6.2.2 创建一个 Feign 接口，并添加 @FeignClient 注解；
 
-feign本身里面就包含有了ribbon，就是这个注解 @FeignClient;
+**feign本身里面就包含有了ribbon**，就是这个注解 @FeignClient;
 
 #### 6.2.3 修改启动类，添加注解 @EnableFeignClients
 
@@ -214,6 +234,178 @@ public interface UserFeignClient{}
 ```
 
 - 与Ribbon 配置自定义一样，自定义的FeignConfiguration类也不能包含在主应用程序上下文的@ComponentScan 扫描的包重叠，否则自定义的配置信息会被所有的@FeignClient共享；
+
+### 6.4 Feign 的日志
+
+- Feign 的 Logger.Level 只对 DEBUG 作出响应；
+
+Logger.level的级别有
+
+- NONE：不记录任何日志；
+- BASIC：仅记录请求方法，URL、响应状态码以及执行时间；
+- HEADERS：记录 BASIC 级别的基础上，记录请求和响应的 header；
+- FULL：记录请求和响应的 header ，body 和 元数据；
+
+#### 6.4.1 编写 Feign 的配置类
+
+```java
+@Configuration
+public class FeignLogConfiguration {
+  @Bean
+  Logger.Level feignLoggerLevel() {
+    return Logger.Level.BASIC;
+  }
+}
+```
+
+### 6.5 使用 Feign 构造多参数的请求
+
+#### 6.5.1 GET 多参数
+
+- 方法一 @RequestParam
+  对每个参数前面都加上注解 @RequestParam(“”)；
+- 方法二 Map
+
+#### 6.5.2 POST 多参数
+
+如果服务提供者的Controller的多参数前注解@RequestBody，那么请求的Feign 同理，多参数前面用该注解，例：`public post(@RequestBody User)`；
+
+
+
+## 七、 Hystrix 实现容错处理
+
+### 7.1 实现容错手段
+
+#### 7.1.1 雪崩效应
+
+把“<u>基础服务故障</u>”导致“<u>级联故障</u>”的现象称为**雪崩效应**；
+
+#### 7.1.2 如何容错
+
+- 为网络请求设置超时时间；
+- 使用断路器模式；
+  - 对容易导致错误的操作的代理；这种代理能够统计在一段时间内调用失败的次数，并决定正常请求，还是直接返回；
+  - 如果在一段时间内检测到许多类似的错误（例如超时）就会强迫对该服务的调用快速失败；
+  - 如果发现依赖服务正常，就会回复请求该服务；
+
+### 7.2 使用 Hystrix 实现容错
+
+Hystrix 是一个实现了超时机制和断路器模式的工具类库；
+
+#### 7.2.1 Hystrix 简介
+
+一个延迟和容错库；通过以下几点实现延迟和容错；
+
+- **包裹请求**：使用到了命令模式；
+- **跳闸机制**：当某服务的<u>错误率超过一定阈值时，Hystrix 可以自动或手动跳闸</u>停止请求服务一段时间；
+- **资源隔离**：Hystrix 为每个依赖都维护了一个小型的线程池，<u>若线程池满了，发往该依赖的请求就被立刻拒绝</u>，而不是等待；
+- **监控**
+- 回退机制：断路器打开时，执行回退逻辑，可有开发人员自行提供，例如返回一个缺省值；
+- 自我修复：断路器打开一段时间后，会自动进入“半开”状态，可允许**一个**请求访问该依赖的服务；成功就关闭断路器，否则保持打开；
+
+#### 7.2.2 整合 Hystrix
+
+1、添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+```
+
+2、启动类添加启动注解
+
+启动类上添加**@EnableCircuitBreaker**或**@EnableHystrix**
+
+ 3、让某方法具有容错能力
+
+注解  **@HystrixCommand(fallbackMethod** = "fallbackMethod "**)**
+
+```java
+ @HystrixCommand(fallbackMethod = "findByIdFallback")
+  @GetMapping("/user/{id}")
+  public User findById(@PathVariable Long id) {
+    return this.restTemplate.getForObject("http://microservice-provider-user/" + id, User.class);
+  }
+
+  public User findByIdFallback(Long id) {
+    User user = new User();
+    user.setId(-1L);
+    user.setName("默认用户");
+    return user;
+  }
+```
+
+该回退方法与方法具有相同的参数和返回值类型；
+
+**进入回退方法并不代表断路器打开；**因为失败率要达到阈值（5秒内20次）才关闭；
+
+#### 7.2.3 线程隔离策略与传播上下文
+
+两种 线程隔离（默认），信号量隔离；
+
+一般来说，只有当调用负载非常高时（每秒数百次）才需要信号隔离；
+
+#### 7.2.4 Feign 使用 Hystrix
+
+Spring Cloud**默认已为Feign整合了Hystrix**
+
+```java
+@FeignClient(name = "microservice-provider-user", fallback = FeignClientFallback.class)
+public interface UserFeignClient {
+  @RequestMapping(value = "/{id}", method = RequestMethod.GET)
+  public User findById(@PathVariable("id") Long id);
+
+}
+
+/**
+ * 回退类FeignClientFallback需实现Feign Client接口
+ */
+@Component
+class FeignClientFallback implements UserFeignClient {
+  @Override
+  public User findById(Long id) {
+    User user = new User();
+    user.setId(-1L);
+    user.setUsername("默认用户");
+    return user;
+  }
+}
+```
+
+
+
+**检查回退原因**
+
+可以使用注解 @FeignClient 的 **fallbackFactory** 属性；
+
+`@FeignClient(name = "microservice-provider-user", fallback = FeignClientFallback.class)`
+
+需要实现FallbackFactory接口，并覆盖 create 方法
+
+fallbackFactory 属性还有很多其他用途，让不同的异常返回不同的回退结果；
+
+
+
+**Feign禁用Hystrix**
+
+全局的禁用的话只需在application.yml中配置 feign.hystrix.enable=false即可；
+
+部分的话就是编写配置类，在@FeignClient里引用该配置类即可；
+
+### 7.3 Hystrix 的监控
+
+只需添加依赖，就可使用/Hystrix.stream 断点获得Hystrix的监控信息；
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+
 
 # 其他知识点
 
@@ -248,7 +440,7 @@ microservice-simple-provider-user
 
 microservice-simple-consumer-movie
 
-## 第四章
+## 第四章 Eureka
 
 **编写Eureka Server**
 
@@ -272,7 +464,7 @@ microservice-provider-user-my-metadata
 
 microservice-consumer-movie-understanding-metadata
 
-## 第五章
+## 第五章 Ribbon
 
 **为服务消费者整合Ribbon**
 
@@ -290,7 +482,7 @@ mircoservice-consumer-movie-ribbon-customizing-properties
 
 microservice-consumer-movie-without-eureka
 
-## 第六章
+## 第六章 Feign
 
 **为消费者整合 Feign**
 
@@ -305,3 +497,31 @@ microservice-consumer-movie-feign-customizing
 microservice-provider-user-with-auth
 
 microservice-consumer-movie-feign-manual
+
+**Feign 的日志**
+
+microservice-consumer-movie-feign-logging
+
+**构造多参数的请求**
+
+microservice-provider-user-multiple-params
+
+microservice-consumer-movie-feign-multiple-params
+
+## 第七章 Hystrix
+
+**整合 Hystrix**
+
+microservice-consumer-movie-ribbon-hystrix
+
+**Feign 使用 Hystrix**
+
+microservice-consumer-movie-feign-hystrix-fallback
+
+**检查回退原因**
+
+microservice-consumer-movie-feign-hystrix-fallback-factory
+
+**监控信息**
+
+microservice-consumer-movie-feign-hystrix-fallback-stream
