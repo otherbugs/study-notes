@@ -405,6 +405,256 @@ fallbackFactory 属性还有很多其他用途，让不同的异常返回不同�
 </dependency>
 ```
 
+### 7.4 Hystrix Dashboard 可视化监控
+
+1、添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-dashboard</artifactId>
+</dependency>
+```
+
+2、启动类上添加 **@EnableHystrixDashboard**
+
+### 7.5 使用 Turbine 聚合监控数据
+
+Turbine 是一个聚合 Hystrix 监控数据的工具，它可将所有相关的 /Hystrix.stream 端点数据集合到一个组合的 /turbine.steam
+
+#### 7.5.1 Turbine 的使用
+
+1、添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-turbine</artifactId>
+</dependency>
+```
+
+2、启动类上添加 **@EnableTurbine**；
+
+3、配置文件
+
+```yaml
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+turbine:
+  appConfig: microservice-consumer-movie,microservice-consumer-movie-feign-hystrix-fallback-stream
+  clusterNameExpression: "'default'"
+```
+
+
+
+#### 7.5.2 使用消息中间件收集数据 
+
+先安装RabbitMQ
+
+1、添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-hystrix-stream</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-stream-rabbit</artifactId>
+</dependency>
+```
+
+3、配置文件
+
+```yaml
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+	password: guest
+```
+
+
+
+*在Spring Cloud Camden SR4 中，依赖`spring-cloud-starter-turbine`不能与`spring-cloud-starter-turbine-stream`共存，否则会报异常；
+
+## 八、 使用 Zuul 构建微服务网关
+
+### 8.1 为什么使用微服务网关
+
+若客户端直接与各个微服务通信，会有以下问题：
+
+- 客户端会多次请求不同的微服务，增加客户端的复杂性；
+- 存在跨域请求，在一定场景下处理相对复杂；
+- **认证复杂**，每个服务需要独立认证；
+- 难以重构；
+- 某些微服务可能使用了防火墙/浏览器不友好的协议，直接访问会有一定的困难；
+
+### 8.2 Zuul 简介
+
+zuul 是 Netflix 开源的微服务网关，Zuul的核心是一系列的过滤器，这些过滤器完成以下功能：
+
+- 身份认证安全
+- 审查与监控
+- 动态路由：动态地将请求路由到不同的后端集群；
+- 压力测试：逐渐增加指向集群的流量，以了解性能；
+- 负载分配：为每一种负载类型分配对应容量，并弃用超出限定值的请求；
+- 静态响应处理
+- 多区域弹性：跨域AWS Region 进行请求路由，旨在实现ELB使用的多样化，以及让系统的边缘更贴近系统的使用者；
+
+### 8.3 编写 Zuul 微服务网关
+
+1、添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-zuul</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-eureka</artifactId>
+</dependency>
+```
+
+2、启动类添加注解 **@EnableZuulProxy**
+
+声明一个Zuul代理，该代理使用Ribbon来定位用注册在Eureka Server中的微服务，同时，该代理还整合了Hystrix，从而实现容错，所有经过Zuul的请求都会在Hystrix命令执行；
+
+**默认情况下，Zuul会代理所有注册到Eureka Server 的微服务；**路由规则如下：
+
+http://ZUUL_HOST:ZUUL_PORT/微服务在Eureka 的 serviceId/**；
+
+### 8.4 Zuul 的路由端点
+
+当@EnableZuulProxy 与 Spring Boot Actuator配合使用时，Zuul会暴露一个路由管理端点/routes;
+
+`spring-cloud-starter-zuul` 已经包含了 `spring-boot-starter-actuator`
+
+### 8.5 路由配置详解
+
+1. 自定义指定微服务的访问路径；
+
+   ```yaml
+   zuul: 
+     routes: 
+     	microservice-provider-user: /user/**
+   ```
+
+   
+
+   将microservice-provider-user微服务被映射到 /user/**路径，其他微服务还是原来规则；
+
+2. 忽略指定服务；
+   可以使用 zuul.ignored-services 配置忽略的服务，多个符号分隔；
+
+   ```yaml
+   zuul: 
+     ignored-services: microservice-user,microservice-movie
+   ```
+
+3. 忽略所有微服务，只路由指定微服务
+
+   ```yaml
+   zuul: 
+     ignored-services: '*'
+     routes: 
+     	microservice-provider-user: /user/**
+   ```
+
+4. 同时指定微服务的serviceId和对应路径；
+
+   ```yaml
+   zuul: 
+     route: 
+     	service-id: microservice-provider-user
+     	path: /user/**
+   ```
+
+   效果和1一样；
+
+5. 同时指定path和url;
+
+   ```yaml
+   zuul: 
+     routes: 
+     	user-route:
+     	  url: http://localhost:8000/
+     	  path: /user/**
+   ```
+
+   使用这种方式配置的路由不会作为 HystrixCommand执行，同时不能使用 Ribbon 来负载均衡多个URL；例6可以解决问题；
+
+6. 同时指定path 和 URL，并且不破坏Zuul 的Hystrix、Ribbon特性；
+
+   ```yaml
+   zuul: 
+     routes: 
+     	user-route:
+     	  path: /user/**
+     	  service-id: microservice-provider-user
+   ribbon:
+     eureka:
+     	enable: false   # 为Ribbon禁用 Eureka
+    mircoservice-provider-user:
+      ribbon:
+        listOfServers: localhost:8000,localhost:8001
+   ```
+
+7. 使用正则指定Zuul的路有规则
+   借助 PatternServiceRouteMapper
+
+   ```java
+     @Bean
+     public PatternServiceRouteMapper serviceRouteMapper() {//调用构造函数PatternServiceRouteMapper(String servicePattern,String routePattern)
+         //servicePattern 指定微服务的正则
+         //routePattern 指定路由正则
+       return new PatternServiceRouteMapper("(?<name>^.+)-(?<version>v.+$)","${vesion}/${name}");
+     }
+   ```
+
+8. 路由前缀
+   示例1：
+
+   ```yaml
+   zuul: 
+     prefix: /api
+     strip-prefix: false
+     routes: 
+     	microservice-provider-user: /user/**
+   ```
+
+   访问/api/microservice-provider-user/1 会被转发到 microservice-provider-user 的 /api/1
+
+   示例2：
+
+   ```yaml
+   zuul: 
+     routes: 
+     	microservice-provider-user: 
+     	  path: /user/**
+     	  strip-prefix: false
+   ```
+
+   ​	
+
+9. 忽略某些路径
+   可使用 ignoredPatterns，指定忽略的正则
+
+   ```yaml
+   zuul:
+     ignoredPatterns: /**/admin/** #忽略所有包含/admin/的路径
+     routes:
+       microsevice-provider-user: /user/**
+   ```
+
+   
+
 
 
 # 其他知识点
@@ -525,3 +775,23 @@ microservice-consumer-movie-feign-hystrix-fallback-factory
 **监控信息**
 
 microservice-consumer-movie-feign-hystrix-fallback-stream
+
+**Hystrix Dashboard 监控可视化数据**
+
+microservice-hystrix-dashboard
+
+**Turbine 监控多个服务**
+
+microservice-hystrix-turbine
+
+**使用RabbitMQ消息中间件收集数据** 
+
+microservice-consumer-movie-ribbon-hystrix-turbine-mq
+
+microservice-hystrix-turbine-mq
+
+## 第八章 Zuul
+
+**编写网关**
+
+microservice-gateway-zuul
