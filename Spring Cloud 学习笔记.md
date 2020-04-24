@@ -97,7 +97,7 @@
 </dependency>
 ```
 
-- 仓库已经废弃了spring-cloud-starter-eureka-server，推荐使用spring-cloud-starter-netflix-eureka-server。
+- 仓库已经废弃了spring-cloud-starter-eureka-server，推荐使用spring-cloud-starter-netflix-eureka-server。不知道那个哪个版本开始的，c开头的还没变
 
 **2、启动类添加注解 @EnableEurekaServer**
 
@@ -655,6 +655,71 @@ http://ZUUL_HOST:ZUUL_PORT/微服务在Eureka 的 serviceId/**；
 
    
 
+## 九、 Spring Cloud Config 统一配置
+
+### 9.1 编写 config server
+
+1. 添加依赖
+
+   ```xml
+   <dependency>
+     <groupId>org.springframework.cloud</groupId>
+     <artifactId>spring-cloud-config-server</artifactId>
+   </dependency>
+   ```
+
+2. 启动类添加注解 @EnableConfigServer
+
+3. 配置文件
+
+   ```yaml
+   spring:
+    cloud:
+     config:
+      server:
+       git:
+        uri: https://.....
+        username: root
+        password: 123456
+   ```
+
+### 9.2 编写 config client
+
+1. 添加依赖
+
+   ```xml
+   <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-config</artifactId>
+   </dependency>
+   <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+   </dependency>
+   ```
+
+   
+
+2. 配置文件：**bootstrap.yml**
+   不是application.yml!!!
+
+   ```yaml
+   spring:
+     application:
+       name: microservice-foo    # 对应config server所获取的配置文件的{application}
+     cloud:
+       config:
+         uri: http://localhost:8080/
+         profile: dev            # profile对应config server所获取的配置文件中的{profile} 
+         label: master           # 指定Git仓库的分支，对应config server所获取的配置文件的{label}
+   ```
+
+### 9.3 Config 与 Eureka 配合
+
+
+
+
+
 
 
 # 其他知识点
@@ -795,3 +860,33 @@ microservice-hystrix-turbine-mq
 **编写网关**
 
 microservice-gateway-zuul
+
+## 第九章 Config
+
+**编写 Config Server**
+
+microservice-config-server
+
+**编写 Config Client**
+
+microservice-config-client
+
+**编写/refresh 端点手动刷新配置**
+
+microservice-config-client-refresh
+
+**springcloud bus 自动刷新**
+
+microservice-config-client-refresh-cloud-bus
+
+**config 与 Eureka 结合**
+
+microservice-config-server-eureka
+
+microservice-config-client-eureka
+
+**config 的用户认证**
+
+microservice-config-server-authenticating
+
+microservice-config-client-authenticating
