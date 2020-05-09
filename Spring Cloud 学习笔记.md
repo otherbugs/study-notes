@@ -653,7 +653,59 @@ http://ZUUL_HOST:ZUUL_PORT/微服务在Eureka 的 serviceId/**；
        microsevice-provider-user: /user/**
    ```
 
-   
+
+### 8.6 zuul 权限校验
+
+ZuulFilter 过滤器，是 Zuul 的核心组件，通过继承该抽象类，覆写几个关键方法达到可以自定义调度请求的作用；
+
+**使用**
+
+- 继承 ZuulFilter，类上记得加 @Component
+
+- ```java
+  @Component
+  public class MyFilter extends ZuulFilter {
+      /**
+       * 过滤器类型
+       * pre、error、post、route
+       * @return
+       */
+      @Override
+      public String filterType() {
+          return null;
+      }
+  
+      /**
+       * 过滤器顺序，越小越先执行
+       * @return
+       */
+      @Override
+      public int filterOrder() {
+          return 0;
+      }
+  
+      /**
+       * 过滤器是否生效
+       * 返回true需要权限校验，false不需要
+       * @return
+       */
+      @Override
+      public boolean shouldFilter() {
+          return false;
+      }
+  
+      /**
+       * 业务逻辑，返回true才进入该方法
+       * @return
+       */
+      @Override
+      public Object run() {
+          return null;
+      }
+  }
+  ```
+
+
 
 ## 九、 Spring Cloud Config 统一配置
 
